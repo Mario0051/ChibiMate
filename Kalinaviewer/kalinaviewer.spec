@@ -13,7 +13,7 @@ a = Analysis(
         ('kalinasit.webp', '.'),
         ('kalinawait.webp', '.'),
         ('kalinawork1.webp', '.'),
-        ('kalinawork2.webp', '.'),
+        ('kalinawork2.webp', '.')
     ],
     hiddenimports=[],
     hookspath=[],

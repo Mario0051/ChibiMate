@@ -1,2 +1,2 @@
-# Shittygifstuff
-Shitty gif making tools. 
+# ChibiMate
+By Mario and Engi

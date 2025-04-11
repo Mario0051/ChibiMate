@@ -233,9 +233,9 @@ std::vector<UINT> LoadGifFrameInfo(Gdiplus::Image* image) {
 void GenerateFrame(Gdiplus::Bitmap* bmp, Gdiplus::Image* gif) {
     Gdiplus::Graphics dest(bmp);
     
-    // Clear with black (transparent color)
-    Gdiplus::SolidBrush black(Gdiplus::Color::Black);
-    dest.FillRectangle(&black, 0, 0, bmp->GetWidth(), bmp->GetHeight());
+    // Clear with transparent color
+    Gdiplus::SolidBrush transparent(Gdiplus::Color(0, 0, 0, 0));
+    dest.FillRectangle(&transparent, 0, 0, bmp->GetWidth(), bmp->GetHeight());
     
     if (gif) {
         // Draw the GIF

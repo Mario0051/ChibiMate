@@ -233,9 +233,9 @@ std::vector<UINT> LoadGifFrameInfo(Gdiplus::Image* image) {
 void GenerateFrame(Gdiplus::Bitmap* bmp, Gdiplus::Image* gif) {
     Gdiplus::Graphics dest(bmp);
     
-    // Clear with transparent color
-    Gdiplus::SolidBrush transparent(Gdiplus::Color(0, 0, 0, 0));
-    dest.FillRectangle(&transparent, 0, 0, bmp->GetWidth(), bmp->GetHeight());
+    // Clear with black (transparent color)
+    Gdiplus::SolidBrush black(Gdiplus::Color::Black);
+    dest.FillRectangle(&black, 0, 0, bmp->GetWidth(), bmp->GetHeight());
     
     if (gif) {
         // Draw the GIF
@@ -575,7 +575,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 
                 // Draw new frame to top layer
                 Gdiplus::Graphics topGraphics(g_topLayer);
-                topGraphics.Clear(Gdiplus::Color(0, 0, 0, 0));
+                topGraphics.Clear(Gdiplus::Color::Black);
                 topGraphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQuality);
                 topGraphics.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
                 
@@ -606,7 +606,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 
                 // Move top layer to bottom layer for next frame
                 Gdiplus::Graphics bottomGraphics(g_bottomLayer);
-                bottomGraphics.Clear(Gdiplus::Color(0, 0, 0, 0));
+                bottomGraphics.Clear(Gdiplus::Color::Black);
                 bottomGraphics.DrawImage(g_topLayer, 0, 0);
             }
             

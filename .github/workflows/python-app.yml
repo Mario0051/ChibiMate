@@ -44,6 +44,11 @@ jobs:
         script-name: vectorviewer/qt_gif_viewer_fixed.py
         mode: app
         enable-plugins: pyqt5
+    - name: Rename Output
+      shell: pwsh
+      run: |
+        Move-Item -Path Kalinaviewer/build/qt_gif_viewer_fixed.exe -Destination Kalinaviewer/build/KalinaViewer.exe
+        Move-Item -Path vectorviewer/build/qt_gif_viewer_fixed.exe -Destination vectorviewer/build/VectorViewer.exe
     - name: Upload Kalinaviewer
       uses: actions/upload-artifact@v4
       with:

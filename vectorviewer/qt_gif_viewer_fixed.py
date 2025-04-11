@@ -28,11 +28,11 @@ except ImportError:
 
 # Define the GIF files that will be embedded
 EMBEDDED_GIFS = [
-    'vectorlying.gif',
-    'vectorsit.gif',
-    'vectormove.gif',
-    'vectorpick.gif',
-    'vectorwait.gif'
+    'vectorlying.webp',
+    'vectorsit.webp',
+    'vectormove.webp',
+    'vectorpick.webp',
+    'vectorwait.webp'
 ]
 
 class MenuWindow(QDialog):

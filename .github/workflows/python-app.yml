@@ -31,20 +31,26 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Build Kalinaviewer
-      run: |
-        python -m PyInstaller --clean kalinaviewer.spec
-      working-directory: ./Kalinaviewer
+      uses: Nuitka/Nuitka-Action@main
+      with:
+        nuitka-version: main
+        script-name: Kalinaviewer/qt_gif_viewer_fixed.py
+        mode: app
+        enable-plugins: pyqt5
     - name: Build vectorviewer
-      run: |
-        python -m PyInstaller --clean vectorviewer.spec
-      working-directory: ./vectorviewer
+      uses: Nuitka/Nuitka-Action@main
+      with:
+        nuitka-version: main
+        script-name: vectorviewer/qt_gif_viewer_fixed.py
+        mode: app
+        enable-plugins: pyqt5
     - name: Upload Kalinaviewer
       uses: actions/upload-artifact@v4
       with:
         name: Kalinaviewer
-        path: Kalinaviewer/dist/
+        path: Kalinaviewer/build/*.exe
     - name: Upload vectorviewer
       uses: actions/upload-artifact@v4
       with:
         name: vectorviewer
-        path: vectorviewer/dist/
+        path: vectorviewer/build/*.exe

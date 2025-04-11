@@ -575,7 +575,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 
                 // Draw new frame to top layer
                 Gdiplus::Graphics topGraphics(g_topLayer);
-                topGraphics.Clear(Gdiplus::Color::Black);
+                topGraphics.Clear(Gdiplus::Color(0, 0, 0, 0));
                 topGraphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQuality);
                 topGraphics.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
                 
@@ -606,7 +606,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 
                 // Move top layer to bottom layer for next frame
                 Gdiplus::Graphics bottomGraphics(g_bottomLayer);
-                bottomGraphics.Clear(Gdiplus::Color::Black);
+                bottomGraphics.Clear(Gdiplus::Color(0, 0, 0, 0));
                 bottomGraphics.DrawImage(g_topLayer, 0, 0);
             }
             

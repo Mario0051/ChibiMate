@@ -47,15 +47,15 @@ jobs:
     - name: Rename Output
       shell: pwsh
       run: |
-        Move-Item -Path Kalinaviewer/build/qt_gif_viewer_fixed.exe -Destination Kalinaviewer/build/KalinaViewer.exe
-        Move-Item -Path vectorviewer/build/qt_gif_viewer_fixed.exe -Destination vectorviewer/build/VectorViewer.exe
+        Move-Item -Path build/qt_gif_viewer_fixed.exe -Destination build/KalinaViewer.exe
+        Move-Item -Path build/qt_gif_viewer_fixed.exe -Destination build/VectorViewer.exe
     - name: Upload Kalinaviewer
       uses: actions/upload-artifact@v4
       with:
         name: Kalinaviewer
-        path: Kalinaviewer/build/*.exe
+        path: build/KalinaViewer.exe
     - name: Upload vectorviewer
       uses: actions/upload-artifact@v4
       with:
         name: vectorviewer
-        path: vectorviewer/build/*.exe
+        path: build/VectorViewer.exe

@@ -37,6 +37,7 @@ jobs:
         script-name: Kalinaviewer/qt_gif_viewer_fixed.py
         mode: app
         enable-plugins: pyqt5
+        include-data-files: Kalinaviewer/*.webp=./
     - name: Build vectorviewer
       uses: Nuitka/Nuitka-Action@main
       with:
@@ -44,6 +45,7 @@ jobs:
         script-name: vectorviewer/qt_gif_viewer_fixed.py
         mode: app
         enable-plugins: pyqt5
+        include-data-files: vectorviewer/*.webp=./
     - name: Rename Output
       shell: pwsh
       run: |

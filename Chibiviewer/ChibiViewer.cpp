@@ -528,7 +528,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 g_currentFrameIndex = (g_currentFrameIndex + 1) % g_frameQueue.size();
                 
                 // Set timer for next frame
-                UINT nextDelay = std::max(g_frameQueue[g_currentFrameIndex].delay, MIN_FRAME_DELAY);
+                UINT nextDelay = std::numeric_limits<T>::max(g_frameQueue[g_currentFrameIndex].delay, MIN_FRAME_DELAY);
                 SetTimer(hwnd, ANIMATION_TIMER_ID, nextDelay, NULL);
                 
                 // Force redraw
@@ -670,8 +670,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 int newY = pt.y - height / 2;
                 
                 // Clamp to screen bounds
-                newX = std::max(0, std::min(newX, screenWidth - width));
-                newY = std::max(0, std::min(newY, screenHeight - height));
+                newX = std::numeric_limits<T>::max(0, std::min(newX, screenWidth - width));
+                newY = std::numeric_limits<T>::max(0, std::min(newY, screenHeight - height));
                 
                 SetWindowPos(hwnd, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
             }
@@ -837,7 +837,7 @@ void QueueFramesFromGif(size_t gifIndex) {
             FrameInfo frame;
             frame.image = gif.animation.image;
             frame.frameIndex = i;
-            frame.delay = std::max(gif.animation.frameDelays[i], MIN_FRAME_DELAY);
+            frame.delay = std::numeric_limits<T>::max(gif.animation.frameDelays[i], MIN_FRAME_DELAY);
             frame.flipped = gif.flipped;  // Set the flipped state from the GIF
             g_frameQueue.push_back(frame);
         }
@@ -1079,7 +1079,7 @@ void StartStateTimer() {
     
     // Start animation for current GIF with minimum frame delay
     if (g_hasGifs && g_currentGifIndex < g_gifs.size()) {
-        UINT initialDelay = std::max(g_gifs[g_currentGifIndex].animation.frameDelays[0], MIN_FRAME_DELAY);
+        UINT initialDelay = std::numeric_limits<T>::max(g_gifs[g_currentGifIndex].animation.frameDelays[0], MIN_FRAME_DELAY);
         SetTimer(g_hwnd, ANIMATION_TIMER_ID, initialDelay, NULL);
     }
 }

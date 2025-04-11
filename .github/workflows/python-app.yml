@@ -38,6 +38,7 @@ jobs:
         mode: app
         enable-plugins: pyqt5
         include-data-files: Kalinaviewer/*.webp=./
+        windows-console-mode: disable
     - name: Rename Output
       shell: pwsh
       run: |
@@ -50,6 +51,7 @@ jobs:
         mode: app
         enable-plugins: pyqt5
         include-data-files: vectorviewer/*.webp=./
+        windows-console-mode: disable
     - name: Rename Output
       shell: pwsh
       run: |

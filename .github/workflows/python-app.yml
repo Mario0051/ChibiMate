@@ -38,6 +38,10 @@ jobs:
         mode: app
         enable-plugins: pyqt5
         include-data-files: Kalinaviewer/*.webp=./
+    - name: Rename Output
+      shell: pwsh
+      run: |
+        Rename-Item -Path build/qt_gif_viewer_fixed.exe -NewName KalinaViewer.exe
     - name: Build vectorviewer
       uses: Nuitka/Nuitka-Action@main
       with:
@@ -49,8 +53,7 @@ jobs:
     - name: Rename Output
       shell: pwsh
       run: |
-        Move-Item -Path build/qt_gif_viewer_fixed.exe -Destination build/KalinaViewer.exe
-        Move-Item -Path build/qt_gif_viewer_fixed.exe -Destination build/VectorViewer.exe
+        Rename-Item -Path build/qt_gif_viewer_fixed.exe -NewName VectorViewer.exe
     - name: Upload Kalinaviewer
       uses: actions/upload-artifact@v4
       with:

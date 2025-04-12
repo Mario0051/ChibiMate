@@ -31,38 +31,20 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Build Kalinaviewer
-      uses: Nuitka/Nuitka-Action@main
-      with:
-        nuitka-version: main
-        script-name: Kalinaviewer/qt_gif_viewer_fixed.py
-        mode: app
-        enable-plugins: pyqt5
-        include-data-files: Kalinaviewer/*.webp=./
-        windows-console-mode: disable
-    - name: Rename Output
-      shell: pwsh
       run: |
-        Rename-Item -Path build/qt_gif_viewer_fixed.exe -NewName KalinaViewer.exe
+        python -m PyInstaller --clean kalinaviewer.spec
+      working-directory: ./Kalinaviewer
     - name: Build vectorviewer
-      uses: Nuitka/Nuitka-Action@main
-      with:
-        nuitka-version: main
-        script-name: vectorviewer/qt_gif_viewer_fixed.py
-        mode: app
-        enable-plugins: pyqt5
-        include-data-files: vectorviewer/*.webp=./
-        windows-console-mode: disable
-    - name: Rename Output
-      shell: pwsh
       run: |
-        Rename-Item -Path build/qt_gif_viewer_fixed.exe -NewName VectorViewer.exe
+        python -m PyInstaller --clean vectorviewer.spec
+      working-directory: ./vectorviewer
     - name: Upload Kalinaviewer
       uses: actions/upload-artifact@v4
       with:
         name: Kalinaviewer
-        path: build/KalinaViewer.exe
+        path: Kalinaviewer/dist/
     - name: Upload vectorviewer
       uses: actions/upload-artifact@v4
       with:
         name: vectorviewer
-        path: build/VectorViewer.exe
+        path: vectorviewer/dist/

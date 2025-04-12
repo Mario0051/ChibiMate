@@ -75,8 +75,6 @@ dlls_to_exclude = [
     'unicodedata.pyd',
     'VCRUNTIME140.dll',
     'VCRUNTIME140_1.dll',
-    '_imagingcms.cp310-win_amd64.pyd',
-    '_imagingtk.cp310-win_amd64.pyd',
     'd3dcompiler_47.dll',
     'libEGL.dll',
     'libGLESv2.dll',

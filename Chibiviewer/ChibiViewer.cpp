@@ -255,7 +255,6 @@ TransparentGifViewer::TransparentGifViewer()
     connect(menu_window, &MenuWindow::toggleAutoModeSignal, this, &TransparentGifViewer::toggle_auto_mode);
     connect(menu_window, &MenuWindow::nextGifSignal, this, &TransparentGifViewer::next_gif);
 
-    // Initialize gif_files with file names from the directory
     QDir executableDir = QCoreApplication::applicationDirPath();
     QFileInfoList fileInfoList = executableDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
     for (const QFileInfo &fileInfo : fileInfoList) {
@@ -264,7 +263,6 @@ TransparentGifViewer::TransparentGifViewer()
         }
     }
 
-    // Find the index of the "pick" GIF
     auto it = std::find_if(gif_files.begin(), gif_files.end(), [](const std::string& s){
         std::string lower_s = toLower(s);
         QString qs = QString::fromStdString(lower_s);

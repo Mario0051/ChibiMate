@@ -1,0 +1,48 @@
+name: Qt Application
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        id: install_qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.9.0'
+          modules: 'qtimageformats'
+          archives: 'qtbase'
+      - name: Set up MSVC Environment
+        uses: microsoft/setup-msbuild@v1
+      - name: Build Chibiviewer
+        run: |
+          cd Chibiviewer
+          mkdir build && cd build
+          cmake -G "Visual Studio 17 2022" ..
+          cmake --build . --config Release
+      - name: Copy files
+        shell: pwsh
+        run: |
+          $qtBaseDir = "${env:QT_ROOT_DIR}"
+          New-Item -ItemType Directory -path Temp
+          Copy-Item -Path "Chibiviewer\build\Release\ChibiViewer.exe" -Destination Temp
+          Copy-Item -Path "Chibiviewer\*.webp" -Destination Temp
+          Copy-Item -Path "$qtBaseDir\bin\Qt6Core.dll" -Destination Temp
+          Copy-Item -Path "$qtBaseDir\bin\Qt6Gui.dll" -Destination Temp
+          Copy-Item -Path "$qtBaseDir\bin\Qt6Widgets.dll" -Destination Temp
+          New-Item -ItemType Directory -path Temp\imageformats
+          Copy-Item -Path "$qtBaseDir\plugins\imageformats\qgif.dll" -Destination Temp\imageformats
+          Copy-Item -Path "$qtBaseDir\plugins\imageformats\qwebp.dll" -Destination Temp\imageformats
+          New-Item -ItemType Directory -path Temp\platforms
+          Copy-Item -Path "$qtBaseDir\plugins\platforms\qwindows.dll" -Destination Temp\platforms
+      - name: Upload Chibiviewer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chibiviewer
+          path: Temp

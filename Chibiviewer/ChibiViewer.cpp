@@ -21,20 +21,17 @@
 #include <QRect>
 #include <QFileInfo>
 #include <QObject>
+#include <QComboBox>
+#include <QListWidget>
+#include <QRegularExpression>
 
 #include <iostream>
 #include <vector>
 
-// Class declaration
 class TransparentGifViewer;
-//class MenuWindow : public QDialog { // Removed the incomplete declaration
-//public:
-//};
 
-// Function to convert string to lowercase
 std::string toLower(std::string str);
 
-// MenuWindow Class Definition
 class MenuWindow : public QDialog {
     Q_OBJECT
 
@@ -44,6 +41,7 @@ public:
 signals:
     void toggleAutoModeSignal();
     void nextGifSignal();
+    void selectCategorySignal(const QString& category);
 
 public slots:
     void update_button_text();
@@ -52,13 +50,14 @@ private slots:
     void toggle_auto_mode();
     void next_gif();
     void quit_application();
+    void category_selected(const QString& category);
 
 private:
     TransparentGifViewer *parentViewer;
     QPushButton *auto_mode_btn;
+    QListWidget *prefix_list;
 };
 
-// TransparentGifViewer Class Definition
 class TransparentGifViewer : public QWidget {
     Q_OBJECT
 
@@ -66,6 +65,9 @@ public:
     TransparentGifViewer();
     bool auto_mode;
     void start_animation();
+    std::map<QString, std::vector<std::string>> categorized_gifs;
+    void load_gif_category(const QString& category);
+    void load_random_gif_from_category(const QString& category);
 
 signals:
     void animation_error(const QString &message);
@@ -83,7 +85,7 @@ private slots:
     void start_auto_mode();
     void stop_auto_mode();
     void auto_change_state();
-    void start_moving();
+    bool start_moving(const QString& category);
     void move_window();
     void toggle_menu();
     void show_error(const QString &message);
@@ -91,6 +93,20 @@ private slots:
 
 private:
     QImage crop_image(const QImage &img);
+    int findPickGifInCategory(const QString& category) {
+        if (categorized_gifs.count(category) > 0) {
+            const auto& categoryFiles = categorized_gifs[category];
+            for (size_t i = 0; i < categoryFiles.size(); ++i) {
+                if (QString::fromStdString(categoryFiles[i]).toLower().contains("pick")) {
+                    auto it = std::find(gif_files.begin(), gif_files.end(), categoryFiles[i]);
+                    if (it != gif_files.end()) {
+                        return static_cast<int>(std::distance(gif_files.begin(), it));
+                    }
+                }
+            }
+        }
+        return -1;
+    }
 
     QLabel *image_label;
     int current_gif_index;
@@ -122,15 +138,15 @@ private:
 
     MenuWindow *menu_window;
     bool menu_visible;
+    QString current_category;
 };
 
-// MenuWindow Class Implementation
 MenuWindow::MenuWindow(TransparentGifViewer *parent)
     : QDialog(parent), parentViewer(parent)
 {
     setWindowTitle("ChibiMate");
     setStyleSheet("background-color: rgba(50, 50, 50, 255);");
-    setFixedSize(300, 200);
+    setFixedSize(300, 300);
 
     // Center relative to the parent window
     if (parentViewer) {
@@ -153,31 +169,64 @@ MenuWindow::MenuWindow(TransparentGifViewer *parent)
     title->setAlignment(Qt::AlignCenter);
     layout->addWidget(title, 0, 0, 1, 2);
 
+    QLabel *prefix_label = new QLabel("Available Character Sets:");
+    prefix_label->setStyleSheet("color: white;");
+    layout->addWidget(prefix_label, 1, 0, 1, 2);
+
+    prefix_list = new QListWidget();
+    prefix_list->setStyleSheet("color: white; background-color: #444;");
+    connect(prefix_list, &QListWidget::itemClicked, this, [this](QListWidgetItem* item){
+        if (item) {
+            this->category_selected(item->text());
+        }
+    });
+    layout->addWidget(prefix_list, 2, 0, 1, 2);
+
     // Toggle auto mode button
     auto_mode_btn = new QPushButton("Toggle Auto Mode");
     auto_mode_btn->setStyleSheet("color: white; background-color: #444;");
     connect(auto_mode_btn, &QPushButton::clicked, this, &MenuWindow::toggle_auto_mode);
-    layout->addWidget(auto_mode_btn, 1, 0, 1, 2);
+    layout->addWidget(auto_mode_btn, 3, 0, 1, 2);
 
     // Next GIF button
     QPushButton *next_gif_btn = new QPushButton("Next GIF");
     next_gif_btn->setStyleSheet("color: white; background-color: #444;");
     connect(next_gif_btn, &QPushButton::clicked, this, &MenuWindow::next_gif);
-    layout->addWidget(next_gif_btn, 2, 0, 1, 2);
+    layout->addWidget(next_gif_btn, 4, 0, 1, 2);
 
     // Close menu button
     QPushButton *close_menu_btn = new QPushButton("Close Menu");
     close_menu_btn->setStyleSheet("color: white; background-color: #444;");
     connect(close_menu_btn, &QPushButton::clicked, this, &MenuWindow::close);
-    layout->addWidget(close_menu_btn, 3, 0);
+    layout->addWidget(close_menu_btn, 5, 0);
 
     // Quit application button
     QPushButton *quit_app_btn = new QPushButton("Quit");
     quit_app_btn->setStyleSheet("color: white; background-color: #700;");
     connect(quit_app_btn, &QPushButton::clicked, this, &MenuWindow::quit_application);
-    layout->addWidget(quit_app_btn, 3, 1);
+    layout->addWidget(quit_app_btn, 5, 1);
 
     update_button_text();
+
+    if (parentViewer) {
+        std::set<QString> prefixes;
+        for (const auto& categoryMap : parentViewer->categorized_gifs) {
+            QString prefix = categoryMap.first;
+            if (!prefix.isEmpty()) {
+                prefix[0] = prefix[0].toUpper(); // Capitalize the first letter
+            }
+            prefixes.insert(prefix);
+        }
+        for (const QString& prefix : prefixes) {
+            prefix_list->addItem(prefix);
+        }
+        QTimer::singleShot(0, [this]() {
+            if (prefix_list->count() > 0) {
+                prefix_list->setCurrentRow(0);
+                emit selectCategorySignal(prefix_list->currentItem()->text().toLower());
+            }
+        });
+    }
 }
 
 void MenuWindow::update_button_text()
@@ -199,19 +248,22 @@ void MenuWindow::next_gif()
     emit nextGifSignal();
 }
 
+void MenuWindow::category_selected(const QString& category)
+{
+    emit selectCategorySignal(category);
+}
+
 void MenuWindow::quit_application()
 {
     QApplication::quit();
 }
 
-// toLower implementation
 std::string toLower(std::string str) {
     std::transform(str.begin(), str.end(), str.begin(),
                    [](unsigned char c){ return std::tolower(c); });
     return str;
 }
 
-// TransparentGifViewer Class Implementation
 TransparentGifViewer::TransparentGifViewer()
     : current_gif_index(0),
     current_frame(0),
@@ -230,7 +282,6 @@ TransparentGifViewer::TransparentGifViewer()
     move_speed(5),
     move_timer(new QTimer(this)),
     moving(false),
-    menu_window(new MenuWindow(this)),
     menu_visible(false)
 {
     setWindowTitle("GIF Viewer");
@@ -252,31 +303,71 @@ TransparentGifViewer::TransparentGifViewer()
     connect(this, &TransparentGifViewer::animation_error, this, &TransparentGifViewer::show_error);
     connect(auto_timer, &QTimer::timeout, this, &TransparentGifViewer::auto_change_state);
     connect(move_timer, &QTimer::timeout, this, &TransparentGifViewer::move_window);
-    connect(menu_window, &MenuWindow::toggleAutoModeSignal, this, &TransparentGifViewer::toggle_auto_mode);
-    connect(menu_window, &MenuWindow::nextGifSignal, this, &TransparentGifViewer::next_gif);
 
-    QDir executableDir = QCoreApplication::applicationDirPath();
-    QFileInfoList fileInfoList = executableDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QFileInfoList fileInfoList = appDir.entryInfoList(QDir::Files);
     for (const QFileInfo &fileInfo : fileInfoList) {
         if (fileInfo.suffix().toLower() == "webp" || fileInfo.suffix().toLower() == "gif") {
             gif_files.push_back(fileInfo.fileName().toStdString());
+            QString baseName = fileInfo.baseName();
+            QString baseNameLower = baseName.toLower();
+            QString categoryKey;
+
+            // Define your logic to extract the category key (e.g., the part before the action)
+            QStringList parts = baseNameLower.split(QRegularExpression("(laying|move|pick|sit|wait|work1|work2|lying)"));
+            if (!parts.isEmpty()) {
+                categoryKey = parts.first().trimmed(); // Use the prefix as the key
+            } else {
+                categoryKey = baseNameLower; // Fallback if no action suffix is found
+            }
+
+            if (!categoryKey.isEmpty()) {
+                if (categorized_gifs.find(categoryKey) == categorized_gifs.end()) {
+                    categorized_gifs[categoryKey] = {};
+                }
+                categorized_gifs[categoryKey].push_back(fileInfo.fileName().toStdString());
+            }
         }
     }
 
-    auto it = std::find_if(gif_files.begin(), gif_files.end(), [](const std::string& s){
-        std::string lower_s = toLower(s);
-        QString qs = QString::fromStdString(lower_s);
-        return qs.contains("pick");
-    });
-    if (it != gif_files.end()) {
-        pick_gif_index = std::distance(gif_files.begin(), it);
-    }
+    // Create menu window (not shown yet)
+    menu_window = new MenuWindow(this);
+    connect(menu_window, &MenuWindow::toggleAutoModeSignal, this, &TransparentGifViewer::toggle_auto_mode);
+    connect(menu_window, &MenuWindow::nextGifSignal, this, &TransparentGifViewer::next_gif);
+    connect(menu_window, &QDialog::finished, this, &TransparentGifViewer::toggle_menu);
+    connect(menu_window, &MenuWindow::destroyed, qApp, &QApplication::quit);
+    connect(menu_window, &MenuWindow::selectCategorySignal, this, &TransparentGifViewer::load_gif_category);
+}
 
-    if (!gif_files.empty()) {
-        load_current_gif();
-        show();
-    } else {
-        std::cerr << "No GIF files found in the application directory!" << std::endl;
+void TransparentGifViewer::load_gif_category(const QString& category)
+{
+    QString lowerCategory = category.toLower();
+    current_category = lowerCategory;
+    for (const auto& filename : gif_files) {
+        if (QString::fromStdString(filename).startsWith(lowerCategory)) {
+            current_gif_index = std::distance(gif_files.begin(), std::find(gif_files.begin(), gif_files.end(), filename));
+            load_current_gif();
+            if (auto_mode) {
+                start_auto_mode();
+            }
+            return;
+        }
+    }
+}
+
+void TransparentGifViewer::load_random_gif_from_category(const QString& category)
+{
+    if (categorized_gifs.count(category) > 0) {
+        const auto& categoryFiles = categorized_gifs[category];
+        if (!categoryFiles.empty()) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> distrib(0, categoryFiles.size() - 1);
+            size_t randomIndex = distrib(gen);
+            current_gif_index = std::distance(gif_files.begin(),
+                                              std::find(gif_files.begin(), gif_files.end(), categoryFiles[randomIndex]));
+            load_current_gif();
+        }
     }
 }
 
@@ -304,9 +395,9 @@ void TransparentGifViewer::load_current_gif()
     qDebug() << "Loading:" << current_file;
 #endif
 
-    QString file_path = QCoreApplication::applicationDirPath() + "/" + current_file; // Modified line
+    QString file_path = QCoreApplication::applicationDirPath() + "/" + current_file;
 
-    QMovie movie(file_path); // Use file_path
+    QMovie movie(file_path);
     if (!movie.isValid()) {
         emit animation_error(QString("Error loading GIF: ") + current_file);
         return;
@@ -376,25 +467,41 @@ void TransparentGifViewer::next_frame()
 
 void TransparentGifViewer::next_gif()
 {
-    if (!gif_files.empty()) {
+    if (!gif_files.empty() && !current_category.isEmpty() && categorized_gifs.count(current_category) > 0) {
+        const auto& categoryFiles = categorized_gifs[current_category];
+        if (!categoryFiles.empty()) {
+            auto it = std::find(categoryFiles.begin(), categoryFiles.end(), gif_files[current_gif_index]);
+            size_t currentIndexInCategory = std::distance(categoryFiles.begin(), it);
+
+            size_t nextIndexInCategory = (currentIndexInCategory + 1) % categoryFiles.size();
+
+            auto nextItInAll = std::find(gif_files.begin(), gif_files.end(), categoryFiles[nextIndexInCategory]);
+            if (nextItInAll != gif_files.end()) {
+                current_gif_index = std::distance(gif_files.begin(), nextItInAll);
+                load_current_gif();
+                return;
+            }
+        }
+    } else if (!gif_files.empty()) {
         current_gif_index = (current_gif_index + 1) % gif_files.size();
         load_current_gif();
     }
 }
-
 void TransparentGifViewer::toggle_auto_mode()
 {
     auto_mode = !auto_mode;
-#ifndef QT_NO_DEBUG
-    qDebug() << "Auto mode:" << (auto_mode ? "ON" : "OFF");
-#endif
 
+    menu_window->update_button_text();
+#ifndef QT_NO_DEBUG
+    qDebug() << "Auto mode: " << (auto_mode ? "ON" : "OFF");
+#endif
     if (auto_mode) {
-        start_auto_mode();
+        if (!current_category.isEmpty() && categorized_gifs.count(current_category) > 0) {
+            start_auto_mode();
+        }
     } else {
         stop_auto_mode();
     }
-    menu_window->update_button_text();
 }
 
 void TransparentGifViewer::start_auto_mode()
@@ -421,54 +528,75 @@ void TransparentGifViewer::auto_change_state()
     std::uniform_int_distribution<> distrib(10000, 20000);
     auto_timer->start(distrib(gen));
 
-    // 50% chance to move, 50% chance to show random gif
     std::uniform_int_distribution<> bool_distrib(0, 1);
+
     if (bool_distrib(gen)) {
-        start_moving();
+        start_moving(current_category);
     } else {
-        if (gif_files.size() > 1) {
-            int new_index = current_gif_index;
-            std::uniform_int_distribution<> index_distrib(0, gif_files.size() - 1);
-            while (new_index == current_gif_index) {
-                new_index = index_distrib(gen);
+        if (!current_category.isEmpty() && categorized_gifs.count(current_category) > 0) {
+            const auto& categoryFiles = categorized_gifs[current_category];
+            if (!categoryFiles.empty()) {
+                std::uniform_int_distribution<> index_distrib(0, categoryFiles.size() - 1);
+                size_t randomIndex = index_distrib(gen);
+                auto it = std::find(gif_files.begin(), gif_files.end(), categoryFiles[randomIndex]);
+                if (it != gif_files.end()) {
+                    current_gif_index = std::distance(gif_files.begin(), it);
+                    load_current_gif();
+                }
             }
-            current_gif_index = new_index;
-            load_current_gif();
+        } else {
+            // Show random gif (not the current one)
+            if (gif_files.size() > 1) {
+                int new_index = current_gif_index;
+                std::uniform_int_distribution<> index_distrib(0, gif_files.size() - 1);
+                while (new_index == current_gif_index) {
+                    new_index = index_distrib(gen);
+                }
+                current_gif_index = new_index;
+                load_current_gif();
+            }
         }
     }
 }
 
-void TransparentGifViewer::start_moving()
+bool TransparentGifViewer::start_moving(const QString& category)
 {
-    moving = true;
-
     // Find and load the walking animation if available
-    int move_gif_index = -1;
+    int move_gif_index_in_category = -1;
     QString lower_filename;
-    for (size_t i = 0; i < gif_files.size(); ++i) {
-        lower_filename = QString::fromStdString(gif_files[i]).toLower();
-        if (lower_filename.contains("move") || lower_filename.contains("walk")) {
-            move_gif_index = i;
-            break;
+    std::vector<std::string> filesToSearch = gif_files;
+
+    if (!category.isEmpty() && categorized_gifs.count(category) > 0) {
+        filesToSearch = categorized_gifs[category];
+        for (size_t i = 0; i < filesToSearch.size(); ++i) {
+            lower_filename = QString::fromStdString(filesToSearch[i]).toLower();
+            if (lower_filename.contains("move") || lower_filename.contains("walk")) {
+                auto it = std::find(gif_files.begin(), gif_files.end(), filesToSearch[i]);
+                if (it != gif_files.end()) {
+                    current_gif_index = std::distance(gif_files.begin(), it);
+                    load_current_gif();
+
+                    // Start the movement timer
+                    move_timer->start(50);
+
+                    // Randomly choose direction
+                    std::uniform_int_distribution<unsigned int> direction_index_distrib(0, 1);
+                    std::vector<std::string> possibleDirections = {"left", "right"};
+                    if (direction_index_distrib(*QRandomGenerator::global()) < possibleDirections.size()) {
+                        move_direction = possibleDirections[direction_index_distrib(*QRandomGenerator::global())];
+                    } else {
+                        move_direction = "right";
+                    }
+                    moving = true;
+                    return true;
+                }
+                break;
+            }
         }
-    }
-
-    if (move_gif_index != -1) {
-        current_gif_index = move_gif_index;
-        load_current_gif();
-    }
-
-    // Randomly choose direction
-    std::uniform_int_distribution<unsigned int> direction_index_distrib(0, 1);
-    std::vector<std::string> possibleDirections = {"left", "right"};
-    if (direction_index_distrib(*QRandomGenerator::global()) < possibleDirections.size()) {
-        move_direction = possibleDirections[direction_index_distrib(*QRandomGenerator::global())];
+        return false;
     } else {
-        move_direction = "right";
+        return false;
     }
-
-    // Start the movement timer
-    move_timer->start(50);
 }
 
 void TransparentGifViewer::move_window()
@@ -481,22 +609,21 @@ void TransparentGifViewer::move_window()
     QRect screen_rect = screen->availableGeometry();
     QRect window_rect = this->frameGeometry();
 
+    // Check if window is about to leave the screen and reverse direction if needed
     if (move_direction == "right" && window_rect.right() + move_speed > screen_rect.right()) {
+        // About to hit right edge, change direction
         move_direction = "left";
-#ifndef QT_NO_DEBUG
-        qDebug() << "Reached right screen edge, reversing direction";
-#endif
     } else if (move_direction == "left" && window_rect.left() - move_speed < screen_rect.left()) {
+        // About to hit left edge, change direction
         move_direction = "right";
-#ifndef QT_NO_DEBUG
-        qDebug() << "Reached left screen edge, reversing direction";
-#endif
     }
 
+    // Move in the current direction
     if (move_direction == "right") {
         image_label->setPixmap(frames[current_frame]);
         move(pos.x() + move_speed, pos.y());
     } else {
+        // Show flipped frames and move left
         image_label->setPixmap(flipped_frames[current_frame]);
         move(pos.x() - move_speed, pos.y());
     }
@@ -508,7 +635,9 @@ void TransparentGifViewer::toggle_menu()
         menu_window->hide();
         menu_visible = false;
     } else {
+        // Update button text before showing
         menu_window->update_button_text();
+        // Center relative to the main window
         menu_window->move(x() + width() / 2 - menu_window->width() / 2,
                           y() + height() / 2 - menu_window->height() / 2);
         menu_window->show();
@@ -536,11 +665,13 @@ void TransparentGifViewer::keyPressEvent(QKeyEvent *event)
 void TransparentGifViewer::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
+        // Save complete current state
         pre_drag_gif_index = current_gif_index;
         pre_drag_auto_mode = auto_mode;
         pre_drag_moving = moving;
         pre_drag_move_direction = move_direction;
 
+        // Save timer states
         pre_drag_auto_timer_active = auto_timer->isActive();
         if (pre_drag_auto_timer_active) {
             pre_drag_auto_timer_remaining = auto_timer->remainingTime();
@@ -548,12 +679,19 @@ void TransparentGifViewer::mousePressEvent(QMouseEvent *event)
 
         pre_drag_move_timer_active = move_timer->isActive();
 
+        // Start dragging
         dragging = true;
         drag_position = event->globalPosition().toPoint() - this->frameGeometry().topLeft();
 
+        // Pause all current activity
         auto_timer->stop();
         move_timer->stop();
         moving = false;
+
+        int categoryPickIndex = -1;
+        if (!current_category.isEmpty()) {
+            categoryPickIndex = findPickGifInCategory(current_category);
+        }
 
         if (auto_mode) {
 #ifndef QT_NO_DEBUG
@@ -561,12 +699,11 @@ void TransparentGifViewer::mousePressEvent(QMouseEvent *event)
 #endif
         }
 
-        if (pick_gif_index != -1) {
+        // Switch to the "pick" GIF if available
+        if (categoryPickIndex != -1) {
+            pick_gif_index = categoryPickIndex;
             current_gif_index = pick_gif_index;
             load_current_gif();
-#ifndef QT_NO_DEBUG
-            qDebug() << "Switched to 'pick' GIF for dragging";
-#endif
         }
 
         event->accept();
@@ -574,7 +711,6 @@ void TransparentGifViewer::mousePressEvent(QMouseEvent *event)
         QWidget::mousePressEvent(event);
     }
 }
-
 void TransparentGifViewer::mouseMoveEvent(QMouseEvent *event)
 {
     if (event->buttons() & Qt::LeftButton && dragging) {
@@ -588,19 +724,23 @@ void TransparentGifViewer::mouseMoveEvent(QMouseEvent *event)
 void TransparentGifViewer::mouseReleaseEvent(QMouseEvent *event)
 {
     if (dragging) {
+        // End dragging state
         dragging = false;
 
+        //Restore previous GIF if we switched to pick GIF
         if (current_gif_index == pick_gif_index) {
             current_gif_index = pre_drag_gif_index;
             load_current_gif();
 #ifndef QT_NO_DEBUG
-            qDebug() << "Restored to previous GIF index" << pre_drag_gif_index;
+            qDebug() << "Restored to previous GIF index: " << current_gif_index;
 #endif
         }
 
+        // Restore previous auto mode if it was active
         if (pre_drag_auto_mode) {
             auto_mode = true;
 
+            // Restore movement state if it was moving
             if (pre_drag_moving) {
                 moving = true;
                 move_direction = pre_drag_move_direction;
@@ -612,13 +752,16 @@ void TransparentGifViewer::mouseReleaseEvent(QMouseEvent *event)
                 }
             }
 
+            // Restore auto timer with remaining time if it was active
             if (pre_drag_auto_timer_active) {
+                // Use either remaining time or a default if time already passed
                 int remaining_time = std::max(pre_drag_auto_timer_remaining, 1000);
                 auto_timer->start(remaining_time);
 #ifndef QT_NO_DEBUG
                 qDebug() << "Restored auto timer with" << remaining_time << "ms remaining";
 #endif
             } else {
+                // If timer wasn't active, restart auto behavior
                 start_auto_mode();
             }
 
@@ -641,6 +784,7 @@ int main(int argc, char *argv[])
 #endif
 
     TransparentGifViewer viewer;
+    viewer.show();
 
     return a.exec();
 }

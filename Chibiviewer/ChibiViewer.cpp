@@ -213,7 +213,10 @@ MenuWindow::MenuWindow(TransparentGifViewer *parent)
         for (const auto& categoryMap : parentViewer->categorized_gifs) {
             QString prefix = categoryMap.first;
             if (!prefix.isEmpty()) {
-                prefix[0] = prefix[0].toUpper(); // Capitalize the first letter
+                if(prefix.startsWith("hk")) {
+                    prefix[1] = prefix[1].toUpper();
+                }
+                prefix[0] = prefix[0].toUpper();
             }
             prefixes.insert(prefix);
         }

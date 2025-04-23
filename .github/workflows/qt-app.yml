@@ -39,7 +39,6 @@ jobs:
           New-Item -ItemType Directory -path Temp\imageformats
           Copy-Item -Path "$qtBaseDir\plugins\imageformats\qgif.dll" -Destination Temp\imageformats
           Copy-Item -Path "$qtBaseDir\plugins\imageformats\qwebp.dll" -Destination Temp\imageformats
-          Copy-Item -Path "$qtBaseDir\plugins\imageformats\qpng.dll" -Destination Temp\imageformats
           New-Item -ItemType Directory -path Temp\platforms
           Copy-Item -Path "$qtBaseDir\plugins\platforms\qwindows.dll" -Destination Temp\platforms
       - name: Upload Chibiviewer

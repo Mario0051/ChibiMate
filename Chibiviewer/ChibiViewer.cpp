@@ -16,7 +16,7 @@
 #include <QDirIterator>
 #include <QStringList>
 #include <QString>
-#include <QDebug> // Keep for simulated Python output
+#include <QDebug>
 #include <QRandomGenerator>
 #include <QRect>
 #include <QFileInfo>
@@ -92,13 +92,14 @@ public:
             if (!pixmap.isNull()) {
                 width = pixmap.width();
                 height = pixmap.height();
+#ifndef QT_NO_DEBUG
                 qDebug() << "Loaded furniture:" << filename << "(" << width << "x" << height << ")";
-            } else {
-                // Use qWarning for actual warnings, not simulating prints
-                // qWarning() << "Failed to load furniture pixmap:" << image_path;
+#endif
             }
         } else {
+#ifndef QT_NO_DEBUG
             qDebug() << "Furniture image not found:" << image_path;
+#endif
         }
     }
 
@@ -110,7 +111,7 @@ public:
         }
     }
 
-    // Show the furniture window and ensure it's on top
+    // Show the furniture window
     void show() {
         if (window && !pixmap.isNull()) {
             window->show();
@@ -304,6 +305,7 @@ private slots:
     void on_prefix_selected();
 
 private:
+    // Helper to capitalize prefix for display (with special case)
     QString capitalize(const QString& str);
 
     TransparentGifViewer *parentViewer; // Keep track of the parent
@@ -391,15 +393,15 @@ MenuWindow::MenuWindow(TransparentGifViewer *parent)
     // Adjust size and position
     layout->activate();
     adjustSize();
-     if (parentViewer) {
+    if (parentViewer) {
         // Center relative to the parent window
         move(parentViewer->x() + parentViewer->width() / 2 - width() / 2,
              parentViewer->y() + parentViewer->height() / 2 - height() / 2);
     } else {
-         QScreen *screen = QGuiApplication::primaryScreen();
-         if (screen) {
-             move(screen->geometry().center() - frameGeometry().center());
-         }
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen) {
+            move(screen->geometry().center() - frameGeometry().center());
+        }
     }
     update_button_text();
 }
@@ -447,17 +449,20 @@ void MenuWindow::quit_application() {
 }
 
 void MenuWindow::on_prefix_selected() {
-     QListWidgetItem *current = prefix_list_widget->currentItem();
-     if (current && parentViewer) {
-         QString raw_prefix = current->data(Qt::UserRole).toString();
-         if (raw_prefix != parentViewer->get_current_prefix()) {
-             emit prefixSelectedSignal(raw_prefix);
-         }
-     }
+    QListWidgetItem *current = prefix_list_widget->currentItem();
+    if (current && parentViewer) {
+        QString raw_prefix = current->data(Qt::UserRole).toString();
+        if (raw_prefix != parentViewer->get_current_prefix()) {
+            emit prefixSelectedSignal(raw_prefix);
+        }
+    }
 }
 
 QString MenuWindow::capitalize(const QString& str) {
     if (str.isEmpty()) return str;
+    if (str.toLower() == "hk416") {
+        return "HK416";
+    }
     return str.at(0).toUpper() + str.mid(1).toLower();
 }
 
@@ -534,8 +539,6 @@ TransparentGifViewer::TransparentGifViewer()
     QString initial_prefix = "";
     if (!available_raw_prefixes.isEmpty()) {
         initial_prefix = available_raw_prefixes.first();
-    } else {
-         //qWarning() << "No character prefixes found! Check animation file naming.";
     }
 
     // Create menu window
@@ -621,15 +624,18 @@ void TransparentGifViewer::discover_animations_and_prefixes() {
 
     available_raw_prefixes = QStringList(unique_prefixes.begin(), unique_prefixes.end());
     available_raw_prefixes.sort();
-
+#ifndef QT_NO_DEBUG
     qDebug() << "Found" << file_count << "animation files.";
+#endif
 }
 
 void TransparentGifViewer::filter_and_load_gifs(const QString& prefix_to_load) {
+#ifndef QT_NO_DEBUG
     qDebug() << "Loading prefix:" << prefix_to_load;
+#endif
 
     if (prefix_to_load == current_prefix && !gif_files.empty()) {
-         return;
+        return;
     }
 
     current_prefix = prefix_to_load;
@@ -642,21 +648,20 @@ void TransparentGifViewer::filter_and_load_gifs(const QString& prefix_to_load) {
     }
 
     if (gif_files.empty()) {
-        //qWarning() << "No animation files found for prefix:" << prefix_to_load;
         emit animation_error("No animations found for selected character: " + prefix_to_load);
         image_label->clear();
         resize(100,100);
         return;
     }
 
-     if (current_furniture) {
-         finish_using_furniture();
-     }
-     stop_auto_mode();
-     if (menu_window) menu_window->update_button_text();
-     moving = false;
-     walked_to_furniture = false;
-     facing_direction = "right";
+    if (current_furniture) {
+        finish_using_furniture();
+    }
+    stop_auto_mode();
+    if (menu_window) menu_window->update_button_text();
+    moving = false;
+    walked_to_furniture = false;
+    facing_direction = "right";
 
     categorize_gifs();
 
@@ -667,7 +672,6 @@ void TransparentGifViewer::filter_and_load_gifs(const QString& prefix_to_load) {
     }
 
     if (gif_files.empty()) {
-        //qCritical() << "Cannot load initial GIF for prefix" << current_prefix << " - No files remain after filtering/categorization?";
         emit animation_error("Cannot load initial GIF for " + current_prefix);
         image_label->clear();
         resize(100,100);
@@ -681,9 +685,7 @@ void TransparentGifViewer::filter_and_load_gifs(const QString& prefix_to_load) {
     }
 }
 
-// Categorize GIFs by their type based on filename
 void TransparentGifViewer::categorize_gifs() {
-    //qDebug() << "Categorizing GIFs for prefix:" << current_prefix;
     gif_type_indices.clear();
     gif_type_indices["wait"] = -1; gif_type_indices["walk"] = -1; gif_type_indices["sit"] = -1;
     gif_type_indices["laying"] = -1; gif_type_indices["pick"] = -1;
@@ -699,11 +701,13 @@ void TransparentGifViewer::categorize_gifs() {
         if (!action_found.isEmpty()) {
             bool categorized = false;
             if (gif_type_indices.contains(action_found) && gif_type_indices[action_found] == -1) {
-                 gif_type_indices[action_found] = static_cast<int>(i);
-                 categorized = true;
-                 if(action_found == "pick") pick_gif_index = static_cast<int>(i);
+                gif_type_indices[action_found] = static_cast<int>(i);
+                categorized = true;
+                if(action_found == "pick") pick_gif_index = static_cast<int>(i);
             }
+#ifndef QT_NO_DEBUG
             if(categorized) qDebug() << "Found" << action_found << "GIF:" << filename;
+#endif
         }
     }
 
@@ -714,14 +718,14 @@ void TransparentGifViewer::categorize_gifs() {
         if (gif_type_indices["lay"] != -1) {
             gif_type_indices["laying"] = gif_type_indices["lay"];
         } else if (gif_type_indices["layingalt"] != -1) {
-             gif_type_indices["laying"] = gif_type_indices["layingalt"];
+            gif_type_indices["laying"] = gif_type_indices["layingalt"];
         }
     }
 
     int fallback_wait_index = 0;
     if (gif_type_indices["wait"] == -1) {
         if (!gif_files.empty()) {
-             gif_type_indices["wait"] = fallback_wait_index;
+            gif_type_indices["wait"] = fallback_wait_index;
         }
     }
 
@@ -749,7 +753,6 @@ QString TransparentGifViewer::get_current_prefix() const {
 
 void TransparentGifViewer::set_character_prefix(const QString& prefix) {
     if (!available_raw_prefixes.contains(prefix)) {
-        //qWarning() << "Attempted to set invalid prefix:" << prefix;
         return;
     }
     filter_and_load_gifs(prefix);
@@ -766,22 +769,18 @@ QImage TransparentGifViewer::crop_image(const QImage &img) {
 
 void TransparentGifViewer::load_current_gif() {
     if (gif_files.empty()) {
-         //qCritical() << "load_current_gif: No GIFs available for prefix " << current_prefix;
-         emit animation_error("No GIFs available for " + current_prefix);
-         image_label->clear(); resize(100,100); return;
+        emit animation_error("No GIFs available for " + current_prefix);
+        image_label->clear(); resize(100,100); return;
     }
     if (current_gif_index < 0 || current_gif_index >= static_cast<int>(gif_files.size())) {
-        //qWarning() << "load_current_gif: Index" << current_gif_index << "out of bounds for prefix" << current_prefix << "(size" << gif_files.size() << "). Falling back.";
         current_gif_index = gif_type_indices.value("wait", 0);
-         if (current_gif_index < 0 || current_gif_index >= static_cast<int>(gif_files.size())) {
-             current_gif_index = 0;
-         }
-         if (current_gif_index < 0 || current_gif_index >= static_cast<int>(gif_files.size())) {
-              //qCritical() << "Cannot load any GIF index for prefix " << current_prefix;
-              emit animation_error("Cannot load any GIF index for " + current_prefix);
-              image_label->clear(); resize(100,100); return;
-         }
-         //qWarning() << "Falling back to load index:" << current_gif_index;
+        if (current_gif_index < 0 || current_gif_index >= static_cast<int>(gif_files.size())) {
+            current_gif_index = 0;
+        }
+        if (current_gif_index < 0 || current_gif_index >= static_cast<int>(gif_files.size())) {
+            emit animation_error("Cannot load any GIF index for " + current_prefix);
+            image_label->clear(); resize(100,100); return;
+        }
     }
 
     animation_timer->stop();
@@ -791,16 +790,17 @@ void TransparentGifViewer::load_current_gif() {
     current_frame = 0;
 
     QString current_file = QString::fromStdString(gif_files[current_gif_index]);
+#ifndef QT_NO_DEBUG
     qDebug() << "Loading:" << current_file;
+#endif
 
 
     QString file_path = QCoreApplication::applicationDirPath() + "/" + current_file;
     QMovie movie(file_path);
 
     if (!movie.isValid()) {
-        //qWarning() << "  QMovie invalid for:" << current_file;
         emit animation_error(QString("Error loading GIF (invalid movie): ") + current_file);
-         image_label->clear(); resize(100,100); return;
+        image_label->clear(); resize(100,100); return;
     }
 
     int frame_count = movie.frameCount();
@@ -822,14 +822,14 @@ void TransparentGifViewer::load_current_gif() {
         for (int i = 0; i < frame_count; ++i) {
             QImage current = movie.currentImage();
             if (current.isNull()) {
-                 if (i < frame_count - 1 && !movie.jumpToNextFrame()) break;
+                if (i < frame_count - 1 && !movie.jumpToNextFrame()) break;
                 continue;
             }
             QImage cropped = crop_image(current);
-             if (cropped.isNull()) {
-                 if (i < frame_count - 1 && !movie.jumpToNextFrame()) break;
-                 continue;
-             }
+            if (cropped.isNull()) {
+                if (i < frame_count - 1 && !movie.jumpToNextFrame()) break;
+                continue;
+            }
             QPixmap pixmap = QPixmap::fromImage(cropped);
             QPixmap flipped_pixmap = pixmap.transformed(QTransform().scale(-1, 1));
             frames.push_back(pixmap);
@@ -845,9 +845,8 @@ void TransparentGifViewer::load_current_gif() {
 
 
     if (frames.empty()) {
-        //qWarning() << "  No valid frames extracted from" << current_file;
         emit animation_error(QString("No valid frames extracted from ") + current_file);
-         image_label->clear(); resize(100,100); return;
+        image_label->clear(); resize(100,100); return;
     }
 
     resize(frames[0].width(), frames[0].height());
@@ -864,21 +863,21 @@ void TransparentGifViewer::show_error(const QString &message) {
 }
 
 void TransparentGifViewer::start_animation() {
-     if (!frames.empty() && !durations.empty() && current_frame < durations.size() && current_frame >= 0) {
+    if (!frames.empty() && !durations.empty() && current_frame < durations.size() && current_frame >= 0) {
         int duration = durations[current_frame] > 0 ? durations[current_frame] : 100;
         animation_timer->start(duration);
     } else if (!frames.empty()) {
-         image_label->setPixmap(facing_direction == "right" ? frames[0] : flipped_frames[0]);
-         animation_timer->stop();
+        image_label->setPixmap(facing_direction == "right" ? frames[0] : flipped_frames[0]);
+        animation_timer->stop();
     }
 }
 
 void TransparentGifViewer::next_frame() {
-     if (frames.empty()) {
+    if (frames.empty()) {
         animation_timer->stop();
         return;
     }
-     if (frames.size() == 1) {
+    if (frames.size() == 1) {
         if(animation_timer->isActive()) animation_timer->stop();
         return;
     }
@@ -896,10 +895,9 @@ void TransparentGifViewer::next_frame() {
             if(!animation_timer->isActive()) animation_timer->start();
         }
     } else {
-        //qWarning() << "next_frame: Index mismatch! frame=" << current_frame << "frames.size=" << frames.size() << "durations.size=" << durations.size();
         current_frame = 0;
         if (!frames.empty()) {
-             image_label->setPixmap(facing_direction == "right" ? frames[0] : flipped_frames[0]);
+            image_label->setPixmap(facing_direction == "right" ? frames[0] : flipped_frames[0]);
         }
         animation_timer->setInterval(100);
         if (!animation_timer->isActive()) animation_timer->start();
@@ -907,17 +905,19 @@ void TransparentGifViewer::next_frame() {
 }
 
 void TransparentGifViewer::next_gif() {
-     if (gif_files.empty()) return;
-     int current_raw_index = current_gif_index;
-     int next_raw_index = (current_raw_index + 1) % gif_files.size();
+    if (gif_files.empty()) return;
+    int current_raw_index = current_gif_index;
+    int next_raw_index = (current_raw_index + 1) % gif_files.size();
     current_gif_index = next_raw_index;
     load_current_gif();
 }
 
 void TransparentGifViewer::toggle_auto_mode() {
-     auto_mode = !auto_mode;
-     if(menu_window) menu_window->update_button_text();
+    auto_mode = !auto_mode;
+    if(menu_window) menu_window->update_button_text();
+#ifndef QT_NO_DEBUG
     qDebug() << "Auto mode:" << (auto_mode ? "ON" : "OFF");
+#endif
     if (auto_mode) {
         start_auto_mode();
     } else {
@@ -937,17 +937,17 @@ void TransparentGifViewer::stop_auto_mode() {
     moving = false;
     current_behavior = "wait";
     int wait_index = gif_type_indices.value("wait", -1);
-     if (wait_index != -1 && wait_index < static_cast<int>(gif_files.size())) {
+    if (wait_index != -1 && wait_index < static_cast<int>(gif_files.size())) {
         current_gif_index = wait_index;
         load_current_gif();
     } else if (!gif_files.empty()) {
-         current_gif_index = 0;
-         load_current_gif();
+        current_gif_index = 0;
+        load_current_gif();
     }
 }
 
 void TransparentGifViewer::auto_change_state() {
-     if (!auto_mode) return;
+    if (!auto_mode) return;
     move_timer->stop();
     moving = false;
 
@@ -957,14 +957,16 @@ void TransparentGifViewer::auto_change_state() {
     else if (walked_to_furniture) { possible_behaviors.clear(); possible_behaviors << "use_furniture"; }
 
     if (possible_behaviors.size() > 1) {
-         if (current_behavior == "wait") possible_behaviors.removeAll("wait");
-         else if (current_behavior == "walk" || current_behavior == "walk_to_furniture") possible_behaviors.removeAll("walk");
-         else if (current_behavior == "sit" || current_behavior == "laying") possible_behaviors.removeAll("use_furniture");
+        if (current_behavior == "wait") possible_behaviors.removeAll("wait");
+        else if (current_behavior == "walk" || current_behavior == "walk_to_furniture") possible_behaviors.removeAll("walk");
+        else if (current_behavior == "sit" || current_behavior == "laying") possible_behaviors.removeAll("use_furniture");
     }
     if (possible_behaviors.isEmpty()) possible_behaviors << "wait";
 
     QString next_logical_behavior = possible_behaviors.at(QRandomGenerator::global()->bounded(possible_behaviors.size()));
+#ifndef QT_NO_DEBUG
     qDebug() << "Auto mode: Switching to behavior:" << next_logical_behavior;
+#endif
 
     if(next_logical_behavior != "use_furniture") walked_to_furniture = false;
 
@@ -973,13 +975,13 @@ void TransparentGifViewer::auto_change_state() {
         current_behavior = "wait";
         index = gif_type_indices.value("wait", -1);
         if (index != -1 && index < static_cast<int>(gif_files.size())) { current_gif_index = index; load_current_gif(); }
-         else if (!gif_files.empty()) { current_gif_index = 0; load_current_gif(); }
+        else if (!gif_files.empty()) { current_gif_index = 0; load_current_gif(); }
     } else if (next_logical_behavior == "walk") {
         start_moving();
     } else if (next_logical_behavior == "walk_to_furniture") {
         QStringList available_types = furniture_types.keys();
-         if (!available_types.isEmpty()) create_furniture(available_types.at(QRandomGenerator::global()->bounded(available_types.size())));
-         else { current_behavior = "wait"; index = gif_type_indices.value("wait", 0); if (!gif_files.empty() && index < static_cast<int>(gif_files.size()) && index >=0) {current_gif_index = index; load_current_gif();} else if (!gif_files.empty()) { current_gif_index = 0; load_current_gif(); } }
+        if (!available_types.isEmpty()) create_furniture(available_types.at(QRandomGenerator::global()->bounded(available_types.size())));
+        else { current_behavior = "wait"; index = gif_type_indices.value("wait", 0); if (!gif_files.empty() && index < static_cast<int>(gif_files.size()) && index >=0) {current_gif_index = index; load_current_gif();} else if (!gif_files.empty()) { current_gif_index = 0; load_current_gif(); } }
     } else if (next_logical_behavior == "use_furniture") {
         use_furniture();
     }
@@ -987,10 +989,10 @@ void TransparentGifViewer::auto_change_state() {
     std::uniform_int_distribution<> distrib(10000, 20000);
     int duration = distrib(*QRandomGenerator::global());
     if (current_behavior != "sit" && current_behavior != "laying") {
-         auto_timer->start(duration);
+        auto_timer->start(duration);
     } else {
-         auto_timer->stop();
-         if (!furniture_use_timer->isActive()) furniture_use_timer->start(duration);
+        auto_timer->stop();
+        if (!furniture_use_timer->isActive()) furniture_use_timer->start(duration);
     }
 }
 
@@ -1002,8 +1004,6 @@ void TransparentGifViewer::start_moving() {
     if (index != -1 && index < static_cast<int>(gif_files.size())) {
         current_gif_index = index;
         load_current_gif();
-    } else {
-        //qWarning() << "Walk animation index invalid or not found (" << index << ") for prefix" << current_prefix << ". Movement may use wrong animation.";
     }
 
     move_direction = (QRandomGenerator::global()->bounded(2) == 0) ? "left" : "right";
@@ -1012,7 +1012,7 @@ void TransparentGifViewer::start_moving() {
 }
 
 void TransparentGifViewer::start_walk_to_furniture() {
-     if (!current_furniture) return;
+    if (!current_furniture) return;
     moving = true;
     walked_to_furniture = false;
     current_behavior = "walk_to_furniture";
@@ -1021,15 +1021,15 @@ void TransparentGifViewer::start_walk_to_furniture() {
     if (index != -1 && index < static_cast<int>(gif_files.size())) {
         current_gif_index = index;
         load_current_gif();
-    } else {
-         //qWarning() << "Walk animation index invalid or not found (" << index << ") for prefix" << current_prefix << ". Walk to furniture may use wrong animation.";
     }
 
     int character_center_x = x() + width() / 2;
     furniture_target_x = current_furniture->get_center_x();
     move_direction = (furniture_target_x > character_center_x) ? "right" : "left";
     facing_direction = move_direction;
+#ifndef QT_NO_DEBUG
     qDebug() << "Starting walk to furniture in" << move_direction << "direction";
+#endif
     move_timer->start(50);
 }
 
@@ -1043,16 +1043,20 @@ void TransparentGifViewer::move_window() {
         QScreen *screen = QGuiApplication::screenAt(current_pos); if (!screen) screen = QGuiApplication::primaryScreen(); QRect screen_rect = screen->availableGeometry();
         if (move_direction == "right" && (next_x + width()) > screen_rect.right()) {
             next_x = screen_rect.right() - width(); move_direction = "left"; facing_direction = "left";
+#ifndef QT_NO_DEBUG
             qDebug() << "Reached right screen edge, reversing direction";
+#endif
         }
         else if (move_direction == "left" && next_x < screen_rect.left()) {
             next_x = screen_rect.left(); move_direction = "right"; facing_direction = "right";
+#ifndef QT_NO_DEBUG
             qDebug() << "Reached left screen edge, reversing direction";
+#endif
         }
     }
 
     if (!frames.empty() && current_frame >= 0 && current_frame < frames.size()) {
-       image_label->setPixmap(facing_direction == "right" ? frames[current_frame] : flipped_frames[current_frame]);
+        image_label->setPixmap(facing_direction == "right" ? frames[current_frame] : flipped_frames[current_frame]);
     } else if (!frames.empty()) {
         image_label->setPixmap(facing_direction == "right" ? frames[0] : flipped_frames[0]);
     }
@@ -1062,7 +1066,9 @@ void TransparentGifViewer::move_window() {
     if (current_behavior == "walk_to_furniture" && current_furniture) {
         int character_center_x = next_x + width() / 2;
         if (std::abs(character_center_x - furniture_target_x) < move_speed * 2) {
+#ifndef QT_NO_DEBUG
             qDebug() << "Reached furniture, switching to use_furniture";
+#endif
             walked_to_furniture = true; moving = false; move_timer->stop(); use_furniture();
         }
     }
@@ -1070,8 +1076,8 @@ void TransparentGifViewer::move_window() {
 }
 
 void TransparentGifViewer::create_furniture(const QString& furniture_type) {
-     if (!furniture_types.contains(furniture_type)) { /*qWarning() << "Unknown furniture type:" << furniture_type;*/ return; }
-     if (current_furniture) { delete current_furniture; current_furniture = nullptr; }
+    if (!furniture_types.contains(furniture_type)) { return; }
+    if (current_furniture) { delete current_furniture; current_furniture = nullptr; }
 
     QMap<QString, QVariant> props = furniture_types[furniture_type];
     QString filename = props["filename"].toString();
@@ -1080,7 +1086,7 @@ void TransparentGifViewer::create_furniture(const QString& furniture_type) {
     int x_offset = props["x_offset"].toInt(); int y_offset = props["y_offset"].toInt();
     current_furniture = new Furniture(filename, use_point, use_type, x_offset, y_offset);
 
-    if (current_furniture->pixmap.isNull()) { /*qWarning() << "Failed furniture create:" << filename;*/ delete current_furniture; current_furniture = nullptr; return; }
+    if (current_furniture->pixmap.isNull()) { delete current_furniture; current_furniture = nullptr; return; }
 
     QScreen *screen = QGuiApplication::screenAt(pos()); if (!screen) screen = QGuiApplication::primaryScreen(); QRect screen_rect = screen->availableGeometry();
     int furniture_width = current_furniture->width; int furniture_height = current_furniture->height; int margin = 20;
@@ -1098,14 +1104,16 @@ void TransparentGifViewer::create_furniture(const QString& furniture_type) {
     current_furniture->set_position(final_x, final_y);
     current_furniture->show();
     QTimer::singleShot(20, this, &TransparentGifViewer::raise_window_above_furniture);
+#ifndef QT_NO_DEBUG
     qDebug() << "Created" << furniture_type << "at (" << final_x << "," << final_y << ") with offsets (" << x_offset << "," << y_offset << ")";
+#endif
 
     furniture_target_x = current_furniture->get_center_x(); walked_to_furniture = false;
     if (auto_mode) start_walk_to_furniture();
 }
 
 void TransparentGifViewer::use_furniture() {
-     if (!current_furniture) return;
+    if (!current_furniture) return;
     moving = false; move_timer->stop(); current_behavior = "use_furniture";
     QPoint use_pos = current_furniture->get_use_position(); QString use_type = current_furniture->use_type;
     int char_x = use_pos.x() - width() / 2; int char_y = use_pos.y() - height(); move(char_x, char_y);
@@ -1116,37 +1124,43 @@ void TransparentGifViewer::use_furniture() {
     else { index = gif_type_indices.value("wait", -1); }
     current_behavior = final_behavior;
 
-     if (index != -1 && index < static_cast<int>(gif_files.size())) { current_gif_index = index; load_current_gif(); }
-     else if (!gif_files.empty()) { current_gif_index = 0; load_current_gif(); }
+    if (index != -1 && index < static_cast<int>(gif_files.size())) { current_gif_index = index; load_current_gif(); }
+    else if (!gif_files.empty()) { current_gif_index = 0; load_current_gif(); }
 
     int furniture_center_x = current_furniture->get_center_x();
     facing_direction = (furniture_center_x >= char_x + width() / 2) ? "right" : "left";
     raise_window_above_furniture();
 
     if (auto_mode) {
-         qDebug() << "Using furniture in auto mode - will end with next state change";
-         if (!furniture_use_timer->isActive()){ std::uniform_int_distribution<> d(10000, 20000); furniture_use_timer->start(d(*QRandomGenerator::global())); }
+#ifndef QT_NO_DEBUG
+        qDebug() << "Using furniture in auto mode - will end with next state change";
+#endif
+        if (!furniture_use_timer->isActive()){ std::uniform_int_distribution<> d(10000, 20000); furniture_use_timer->start(d(*QRandomGenerator::global())); }
     } else {
         furniture_use_timer->stop();
+#ifndef QT_NO_DEBUG
         qDebug() << "Using furniture in manual mode - press spacebar to change";
+#endif
     }
     walked_to_furniture = false;
 }
 
 void TransparentGifViewer::finish_using_furniture() {
+#ifndef QT_NO_DEBUG
     qDebug() << "Finished using furniture, removing it";
+#endif
     if (current_furniture) { current_furniture->hide(); delete current_furniture; current_furniture = nullptr; }
     walked_to_furniture = false; moving = false; move_timer->stop();
     current_behavior = "wait";
     int index = gif_type_indices.value("wait", -1);
-     if (index != -1 && index < static_cast<int>(gif_files.size())) { current_gif_index = index; load_current_gif(); }
-     else if (!gif_files.empty()) {current_gif_index = 0; load_current_gif();}
+    if (index != -1 && index < static_cast<int>(gif_files.size())) { current_gif_index = index; load_current_gif(); }
+    else if (!gif_files.empty()) {current_gif_index = 0; load_current_gif();}
 
     if (auto_mode) QTimer::singleShot(100, this, &TransparentGifViewer::auto_change_state);
 }
 
 void TransparentGifViewer::toggle_menu() {
-     if (menu_visible) {
+    if (menu_visible) {
         if (menu_window) menu_window->hide();
         menu_visible = false;
     } else {
@@ -1164,25 +1178,25 @@ void TransparentGifViewer::toggle_menu() {
 }
 
 void TransparentGifViewer::raise_window_above_furniture() {
-     this->raise();
+    this->raise();
 }
 
 void TransparentGifViewer::handle_add_furniture(const QString& type) {
-     create_furniture(type);
+    create_furniture(type);
 }
 
 void TransparentGifViewer::keyPressEvent(QKeyEvent *event) {
-     if (event->key() == Qt::Key_Space && !auto_mode) { if (current_behavior == "sit" || current_behavior == "laying") finish_using_furniture(); else next_gif(); }
-     else if (event->key() == Qt::Key_A) toggle_auto_mode();
-     else if (event->key() == Qt::Key_M) toggle_menu();
-     else if (event->key() == Qt::Key_F && !auto_mode) { create_furniture("couch"); if(current_furniture) start_walk_to_furniture(); }
-     else if (event->key() == Qt::Key_T && !auto_mode) { if (furniture_types.contains("table")) { create_furniture("table"); if(current_furniture) start_walk_to_furniture(); } }
-     else if (event->key() == Qt::Key_Escape) close();
-     else QWidget::keyPressEvent(event);
+    if (event->key() == Qt::Key_Space && !auto_mode) { if (current_behavior == "sit" || current_behavior == "laying") finish_using_furniture(); else next_gif(); }
+    else if (event->key() == Qt::Key_A) toggle_auto_mode();
+    else if (event->key() == Qt::Key_M) toggle_menu();
+    else if (event->key() == Qt::Key_F && !auto_mode) { create_furniture("couch"); if(current_furniture) start_walk_to_furniture(); }
+    else if (event->key() == Qt::Key_T && !auto_mode) { if (furniture_types.contains("table")) { create_furniture("table"); if(current_furniture) start_walk_to_furniture(); } }
+    else if (event->key() == Qt::Key_Escape) close();
+    else QWidget::keyPressEvent(event);
 }
 
 void TransparentGifViewer::mousePressEvent(QMouseEvent *event) {
-     if (event->button() == Qt::LeftButton) {
+    if (event->button() == Qt::LeftButton) {
         // Save complete current state
         pre_drag_gif_index = current_gif_index; pre_drag_auto_mode = auto_mode; pre_drag_moving = moving;
         pre_drag_move_direction = move_direction; pre_drag_facing_direction = facing_direction;
@@ -1190,7 +1204,9 @@ void TransparentGifViewer::mousePressEvent(QMouseEvent *event) {
 
         // Delete furniture if it exists
         if (current_furniture) {
+#ifndef QT_NO_DEBUG
             qDebug() << "Removing furniture during pick";
+#endif
             current_furniture->hide(); delete current_furniture; current_furniture = nullptr; walked_to_furniture = false;
         }
         // Pause all current activity
@@ -1199,8 +1215,10 @@ void TransparentGifViewer::mousePressEvent(QMouseEvent *event) {
 
         // Switch to the "pick" GIF if available
         if (pick_gif_index != -1 && pick_gif_index < static_cast<int>(gif_files.size())) {
-             current_behavior = "pick"; current_gif_index = pick_gif_index; load_current_gif();
-             qDebug() << "Switched to 'pick' GIF for dragging";
+            current_behavior = "pick"; current_gif_index = pick_gif_index; load_current_gif();
+#ifndef QT_NO_DEBUG
+            qDebug() << "Switched to 'pick' GIF for dragging";
+#endif
         } else { current_behavior = "pick"; }
         facing_direction = pre_drag_facing_direction;
         if (!frames.empty() && current_frame >=0 && current_frame < frames.size()) image_label->setPixmap(facing_direction == "right" ? frames[current_frame] : flipped_frames[current_frame]);
@@ -1217,8 +1235,10 @@ void TransparentGifViewer::mouseMoveEvent(QMouseEvent *event) {
 void TransparentGifViewer::mouseReleaseEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton && dragging) {
         dragging = false;
-        // Default to wait state after pick
+// Default to wait state after pick
+#ifndef QT_NO_DEBUG
         qDebug() << "Defaulting to wait state after pick";
+#endif
         current_behavior = "wait";
         int wait_index = gif_type_indices.value("wait", -1);
         if (wait_index != -1 && wait_index < static_cast<int>(gif_files.size())) { current_gif_index = wait_index; load_current_gif(); }
@@ -1226,12 +1246,14 @@ void TransparentGifViewer::mouseReleaseEvent(QMouseEvent *event) {
 
         facing_direction = pre_drag_facing_direction;
         if (!frames.empty() && current_frame >=0 && current_frame < frames.size()) image_label->setPixmap(facing_direction == "right" ? frames[current_frame] : flipped_frames[current_frame]);
-         else if (!frames.empty()) image_label->setPixmap(facing_direction == "right" ? frames[0] : flipped_frames[0]);
+        else if (!frames.empty()) image_label->setPixmap(facing_direction == "right" ? frames[0] : flipped_frames[0]);
 
         // Restore auto mode if it was active
         if (pre_drag_auto_mode) {
             auto_mode = true;
+#ifndef QT_NO_DEBUG
             qDebug() << "Auto mode restored after dragging";
+#endif
             QTimer::singleShot(10, this, &TransparentGifViewer::auto_change_state);
         } else {
             auto_mode = false; auto_timer->stop(); move_timer->stop(); furniture_use_timer->stop(); moving = false;
@@ -1246,9 +1268,11 @@ void TransparentGifViewer::mouseReleaseEvent(QMouseEvent *event) {
 //=============================================================================
 int main(int argc, char *argv[]) {
     QApplication a(argc, argv);
+#ifndef QT_NO_DEBUG
     qDebug() << "Qt Version:" << QT_VERSION_STR;
     qDebug() << "Platform Plugin:" << qApp->platformName();
     qDebug() << "Application Dir:" << QCoreApplication::applicationDirPath();
+#endif
     TransparentGifViewer viewer;
     return a.exec();
 }

@@ -33,6 +33,7 @@ jobs:
           New-Item -ItemType Directory -path Temp
           Copy-Item -Path "Chibiviewer\build\Release\ChibiViewer.exe" -Destination Temp
           Copy-Item -Path "Chibiviewer\*.webp" -Destination Temp
+          Copy-Item -Path "Chibiviewer\couch.png" -Destination Temp
           Copy-Item -Path "$qtBaseDir\bin\Qt6Core.dll" -Destination Temp
           Copy-Item -Path "$qtBaseDir\bin\Qt6Gui.dll" -Destination Temp
           Copy-Item -Path "$qtBaseDir\bin\Qt6Widgets.dll" -Destination Temp

@@ -29,6 +29,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QElapsedTimer>
+#include <QShortcut>
 
 #include <qobjectdefs.h>
 
@@ -566,6 +567,9 @@ TransparentGifViewer::TransparentGifViewer()
         setStyleSheet("background-color: rgba(50,0,0,180);");
         show();
     }
+
+    QShortcut *escapeShortcut = new QShortcut(Qt::Key_Escape, this);
+    connect(escapeShortcut, &QShortcut::activated, qApp, &QApplication::quit);
 }
 
 TransparentGifViewer::~TransparentGifViewer() {

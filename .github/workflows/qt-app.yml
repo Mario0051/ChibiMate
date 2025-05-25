@@ -2,9 +2,9 @@ name: Qt Application
 
 on:
   push:
-    branches: [ "qt" ]
+    branches: [ "spine" ]
   pull_request:
-    branches: [ "qt" ]
+    branches: [ "spine" ]
 
 jobs:
   build:
@@ -32,8 +32,9 @@ jobs:
           $qtBaseDir = "${env:QT_ROOT_DIR}"
           New-Item -ItemType Directory -path Temp
           Copy-Item -Path "Chibiviewer\build\Release\ChibiViewer.exe" -Destination Temp
-          Copy-Item -Path "Chibiviewer\*.webp" -Destination Temp
-          Copy-Item -Path "Chibiviewer\couch.png" -Destination Temp
+          Copy-Item -Path "Chibiviewer\*.atlas" -Destination Temp
+          Copy-Item -Path "Chibiviewer\*.json" -Destination Temp
+          Copy-Item -Path "Chibiviewer\*.png" -Destination Temp
           Copy-Item -Path "$qtBaseDir\bin\Qt6Core.dll" -Destination Temp
           Copy-Item -Path "$qtBaseDir\bin\Qt6Gui.dll" -Destination Temp
           Copy-Item -Path "$qtBaseDir\bin\Qt6Widgets.dll" -Destination Temp

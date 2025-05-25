@@ -35,6 +35,7 @@ jobs:
           Copy-Item -Path "Chibiviewer\*.atlas" -Destination Temp
           Copy-Item -Path "Chibiviewer\*.json" -Destination Temp
           Copy-Item -Path "Chibiviewer\*.png" -Destination Temp
+          Copy-Item -Path "LICENSE" -Destination Temp
           Copy-Item -Path "$qtBaseDir\bin\Qt6Core.dll" -Destination Temp
           Copy-Item -Path "$qtBaseDir\bin\Qt6Gui.dll" -Destination Temp
           Copy-Item -Path "$qtBaseDir\bin\Qt6Widgets.dll" -Destination Temp
